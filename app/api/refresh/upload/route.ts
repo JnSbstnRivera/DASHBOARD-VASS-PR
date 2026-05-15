@@ -61,59 +61,17 @@ function supabaseAdmin() {
 
 export async function POST(req: Request) {
   try {
-    // Modo 1 (nuevo): JSON con { path } — descarga del Supabase Storage
-    // Modo 2 (legacy): FormData con file directo (para archivos chicos / dev)
-    const contentType = req.headers.get("content-type") ?? "";
-    let buf: Buffer;
-    let storagePath: string | null = null;
-    // phase: "ventas" (procesa VENTAS VASS + APOYO) | "seguimiento" (procesa pestañas mensuales) | undefined (todo)
-    let phase: "ventas" | "seguimiento" | "all" = "all";
-    let keepStorage = false;
-
-    if (contentType.includes("application/json")) {
-      const body = await req.json();
-      storagePath = body.path;
-      if (body.phase === "ventas" || body.phase === "seguimiento") {
-        phase = body.phase;
-      }
-      keepStorage = body.keepStorage === true;
-      if (!storagePath) {
-        return NextResponse.json(
-          { ok: false, error: "MISSING_PATH", message: "Falta path del archivo en Storage" },
-          { status: 400 },
-        );
-      }
-      const t0 = Date.now();
-      const storageClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false } },
+    const form = await req.formData();
+    const file = form.get("file");
+    if (!file || !(file instanceof Blob)) {
+      return NextResponse.json(
+        { ok: false, error: "MISSING_FILE", message: "Falta el archivo VASS.xlsx" },
+        { status: 400 },
       );
-      const { data: blob, error: dlErr } = await storageClient.storage
-        .from("vass-uploads")
-        .download(storagePath);
-      if (dlErr || !blob) {
-        return NextResponse.json(
-          { ok: false, error: "STORAGE_DOWNLOAD", message: dlErr?.message ?? "no blob" },
-          { status: 500 },
-        );
-      }
-      buf = Buffer.from(await blob.arrayBuffer());
-      console.log(`[upload] downloaded ${buf.length} bytes from Storage in ${Date.now() - t0}ms`);
-    } else {
-      // Modo legacy
-      const form = await req.formData();
-      const file = form.get("file");
-      if (!file || !(file instanceof Blob)) {
-        return NextResponse.json(
-          { ok: false, error: "MISSING_FILE", message: "Falta el archivo VASS.xlsx" },
-          { status: 400 },
-        );
-      }
-      const t0 = Date.now();
-      buf = Buffer.from(await file.arrayBuffer());
-      console.log(`[upload] file received ${buf.length} bytes in ${Date.now() - t0}ms`);
     }
+    const t0 = Date.now();
+    const buf = Buffer.from(await file.arrayBuffer());
+    console.log(`[upload] file received ${buf.length} bytes in ${Date.now() - t0}ms`);
 
     const t1 = Date.now();
     // Solo parseamos las hojas que nos interesan — descarta pivot/aux tables
@@ -153,15 +111,12 @@ export async function POST(req: Request) {
 
     // ═══════ Fase 1: PARSEAR según `phase` (solo lo necesario, ahorra memoria) ═══════
 
-    // VENTAS VASS — solo si phase=all o phase=ventas
-    const tVentas = Date.now();
+    // VENTAS VASS
     let ventasDescartadas2025 = 0;
     const ventasRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
-    if ((phase === "all" || phase === "ventas") && present.has("VENTAS VASS")) {
+    if (present.has("VENTAS VASS")) {
       const sheet = wb.Sheets["VENTAS VASS"];
-      console.log(`[upload] parsing VENTAS VASS sheet (phase=${phase})`);
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
-      console.log(`[upload] VENTAS VASS rows raw=${raw.length}`);
       for (const r of raw) {
         const closing = serialToISO(r["CLOSING DATE"]);
         if (!closing) continue;
@@ -184,15 +139,14 @@ export async function POST(req: Request) {
           source_file: "VASS.xlsx",
         });
       }
-    } else if (phase === "all" || phase === "ventas") {
+    } else {
       issues.push({ sheet: "VENTAS VASS", problem: "missing_sheet" });
     }
-    console.log(`[upload] VENTAS VASS parsed in ${Date.now() - tVentas}ms · ventasRows=${ventasRows.length} descartadas=${ventasDescartadas2025}`);
 
-    // SEGUIMIENTO (pestañas mensuales) — solo si phase=all o phase=seguimiento
+    // SEGUIMIENTO (pestañas mensuales)
     const mesesEncontrados: string[] = [];
     const seguimientoRows: Database["vass"]["Tables"]["seguimiento"]["Insert"][] = [];
-    if (phase === "all" || phase === "seguimiento") for (const sheetName of wb.SheetNames) {
+    for (const sheetName of wb.SheetNames) {
       const upper = sheetName.trim().toUpperCase();
       if (!MESES_2026.includes(upper)) continue;
       mesesEncontrados.push(upper);
@@ -223,9 +177,8 @@ export async function POST(req: Request) {
     }
 
     // APOYO VENTAS → se mete dentro de vass.ventas con tipo_asistencia="APOYO VENTAS"
-    // Solo si phase=all o phase=ventas
     const apoyoRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
-    if ((phase === "all" || phase === "ventas") && present.has("APOYO VENTAS")) {
+    if (present.has("APOYO VENTAS")) {
       const sheet = wb.Sheets["APOYO VENTAS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
@@ -253,34 +206,25 @@ export async function POST(req: Request) {
       issues.push({ sheet: "APOYO VENTAS", problem: "missing_sheet" });
     }
 
-    // ═══════ Fase 2: TRUNCATE (RPC, instantáneo) ═══════
-    const tTrunc = Date.now();
-    const rpcClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
+    // ═══════ Fase 2: DELETE (limpia tablas) ═══════
     await Promise.all([
       ventasRows.length + apoyoRows.length > 0
-        ? rpcClient.rpc("vass_truncate_ventas").then(({ error }) => {
-            if (error) throw new Error(`truncate ventas: ${error.message}`);
+        ? supa.from("ventas").delete().gte("id", 0).then(({ error }) => {
+            if (error) throw new Error(`limpiando ventas: ${error.message}`);
           })
         : Promise.resolve(),
       seguimientoRows.length > 0
-        ? rpcClient.rpc("vass_truncate_seguimiento").then(({ error }) => {
-            if (error) throw new Error(`truncate seguimiento: ${error.message}`);
+        ? supa.from("seguimiento").delete().gte("id", 0).then(({ error }) => {
+            if (error) throw new Error(`limpiando seguimiento: ${error.message}`);
           })
         : Promise.resolve(),
     ]);
-    console.log(`[upload] TRUNCATE done in ${Date.now() - tTrunc}ms`);
 
-    // ═══════ Fase 3: INSERT ═══════
-    const tIns = Date.now();
+    // ═══════ Fase 3: INSERT en paralelo entre tablas, batches 500 ═══════
     await Promise.all([
       insertBatched("ventas", [...ventasRows, ...apoyoRows]),
       insertBatched("seguimiento", seguimientoRows),
     ]);
-    console.log(`[upload] INSERT done in ${Date.now() - tIns}ms (ventas=${ventasRows.length + apoyoRows.length}, seg=${seguimientoRows.length})`);
 
     const ventasInserted = ventasRows.length;
     const apoyoInserted = apoyoRows.length;
@@ -293,19 +237,8 @@ export async function POST(req: Request) {
       notas: `${ventasInserted} ventas + ${seguimientoInserted} seguimiento (${mesesEncontrados.join(", ")}) + ${apoyoInserted} apoyo`,
     });
 
-    // Cleanup: borrar el archivo del Storage después de procesar (a menos que el cliente pida mantenerlo)
-    if (storagePath && !keepStorage) {
-      const cleanupClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false } },
-      );
-      await cleanupClient.storage.from("vass-uploads").remove([storagePath]);
-    }
-
     return NextResponse.json({
       ok: true,
-      phase,
       ventas: ventasInserted,
       seguimiento: seguimientoInserted,
       apoyoVentas: apoyoInserted,

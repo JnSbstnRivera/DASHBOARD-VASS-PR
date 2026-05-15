@@ -66,81 +66,32 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
     setEstado("parsing");
 
     try {
-      // ── Paso 1: pedir signed URL para subir directo a Supabase Storage ──
-      const urlRes = await fetch("/api/refresh/get-upload-url", { method: "POST" });
-      if (!urlRes.ok) {
-        const text = await urlRes.text();
-        throw new Error(`signed URL: ${urlRes.status} ${text.slice(0, 100)}`);
-      }
-      const urlData: { ok: boolean; path: string; signedUrl: string; token: string; message?: string } = await urlRes.json();
-      if (!urlData.ok) throw new Error(urlData.message ?? "no signed url");
+      const form = new FormData();
+      form.append("file", file);
+      if (forceType) form.append("type", forceType);
 
-      // ── Paso 2: subir archivo directo a Supabase (no pasa por Vercel) ──
-      const putRes = await fetch(urlData.signedUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-      });
-      if (!putRes.ok) {
-        const text = await putRes.text();
-        throw new Error(`upload Storage: ${putRes.status} ${text.slice(0, 100)}`);
-      }
-
-      // ── Paso 3: procesar en 2 fases para evitar OOM en Vercel ──
-      // Fase A: VENTAS + APOYO (~1300 filas, rápido)
-      // Fase B: SEGUIMIENTO (~3800 filas, más lento) — mismo archivo en Storage
+      const res = await fetch("/api/refresh/upload", { method: "POST", body: form });
       setEstado("saving");
       await new Promise((r) => setTimeout(r, 400));
 
-      async function processPhase(phase: "ventas" | "seguimiento", keepStorage: boolean): Promise<UploadResult> {
-        const r = await fetch("/api/refresh/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: urlData.path, phase, keepStorage }),
-        });
-        const ct = r.headers.get("content-type") ?? "";
-        if (!ct.includes("application/json")) {
-          const text = await r.text();
-          const isTimeout = text.includes("FUNCTION_INVOCATION_TIMEOUT") || r.status === 504;
-          return {
-            ok: false,
-            error: isTimeout ? "TIMEOUT" : "SERVER_ERROR",
-            message: isTimeout
-              ? `Fase ${phase}: el servidor tardó demasiado (60s). Algunos datos sí se cargaron.`
-              : `Fase ${phase}: HTTP ${r.status}. Probá de nuevo.`,
-          };
-        }
-        return r.json();
+      // Protegemos el parse por si Vercel devuelve HTML (timeout/error)
+      let data: UploadResult;
+      const ct = res.headers.get("content-type") ?? "";
+      if (!ct.includes("application/json")) {
+        const text = await res.text();
+        const isTimeout = text.includes("FUNCTION_INVOCATION_TIMEOUT") || res.status === 504;
+        data = {
+          ok: false,
+          error: isTimeout ? "TIMEOUT" : "SERVER_ERROR",
+          message: isTimeout
+            ? "El servidor tardó demasiado procesando el Excel (60s). Probá un archivo más liviano (sin pestañas inservibles)."
+            : `El servidor devolvió un error (HTTP ${res.status}). Probá de nuevo.`,
+        };
+      } else {
+        data = await res.json();
       }
 
-      // Fase 1: ventas (mantener archivo en Storage para 2da fase)
-      const ventasData = await processPhase("ventas", true);
-      if (!ventasData.ok) {
-        setResult(ventasData);
-        setEstado("error");
-        return;
-      }
-
-      // Fase 2: seguimiento (borrar archivo después)
-      const segData = await processPhase("seguimiento", false);
-
-      // Consolidar respuesta
-      const data: UploadResult = {
-        ok: segData.ok,
-        ventas: ventasData.ventas,
-        apoyoVentas: ventasData.apoyoVentas,
-        seguimiento: segData.seguimiento ?? 0,
-        mesesSeguimiento: segData.mesesSeguimiento ?? [],
-        descartados2025: (ventasData.descartados2025 ?? 0),
-        uploaded_at: ventasData.uploaded_at,
-        issues: [...(ventasData.issues ?? []), ...(segData.issues ?? [])],
-        sheetsEncontradas: segData.sheetsEncontradas ?? ventasData.sheetsEncontradas,
-        error: segData.error,
-        message: segData.message,
-      };
-      if (!data.ok) {
+      if (!res.ok || !data.ok) {
         setResult(data);
         setEstado("error");
         return;
