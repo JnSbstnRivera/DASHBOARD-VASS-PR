@@ -1,0 +1,925 @@
+@import "tailwindcss";
+
+/* ────────────────────────────────────────────────────────────────
+   Windmar Analytics — Tailwind v4 theme
+   Paleta oficial Windmar Home Puerto Rico
+   ──────────────────────────────────────────────────────────────── */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Paleta oficial Windmar (de paleta de colores.png) */
+  --color-windmar-orange: #f89b24;        /* PANTONE 1375 */
+  --color-windmar-blue: #1d429b;          /* PANTONE 286 */
+  --color-windmar-black: #231f20;
+  --color-windmar-light-blue: #a6c3e6;    /* PANTONE 2717 */
+  --color-windmar-grey: #6d6e71;
+  --color-windmar-tesla-grey: #a7a9ac;
+  --color-windmar-dark: #21274e;          /* azul oscuro para dark mode */
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Light mode (default) — texto BIEN NEGRO, acentos azul Windmar
+   ──────────────────────────────────────────────────────────────── */
+:root {
+  --background: #f5f7fb;        /* gris muy suave para crear contraste con cards */
+  --foreground: #000000;        /* negro puro */
+
+  --card: #ffffff;
+  --card-foreground: #000000;
+
+  --sidebar: #f1f5f9;
+  --sidebar-foreground: #000000;
+  --sidebar-active: #1d429b;
+
+  --border: #94a3b8;            /* borde fuerte y visible */
+  --muted: #e2e8f0;
+  --muted-foreground: #1e293b;  /* texto secundario casi negro */
+
+  --accent: #f89b24;
+  --accent-foreground: #ffffff;
+
+  /* Acento de bordes/focus: azul Windmar en light, naranja en dark */
+  --field-accent: #1d429b;
+  --field-accent-glow: 29, 66, 155;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Dark mode — fondo Windmar Blue Dark (#21274E)
+   ──────────────────────────────────────────────────────────────── */
+.dark {
+  --background: #1a1f3d;
+  --foreground: #f1f5f9;
+
+  --card: #21274e;
+  --card-foreground: #f1f5f9;
+
+  --sidebar: #161a33;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-active: #f89b24;
+
+  --border: #2d3458;
+  --muted: #2d3458;
+  --muted-foreground: #a7a9ac;
+
+  --accent: #f89b24;
+  --accent-foreground: #231f20;
+
+  /* En dark mode, los bordes/focus mantienen el naranja Windmar */
+  --field-accent: #f89b24;
+  --field-accent-glow: 248, 155, 36;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* ────────────────────────────────────────────────────────────────
+   View Transition — círculo que se expande desde el sol/luna
+   al cambiar de tema, cubriendo toda la pantalla.
+   ──────────────────────────────────────────────────────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Estado anterior queda debajo, intacto */
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+/* Estado nuevo emerge como un círculo desde el botón */
+::view-transition-new(root) {
+  z-index: 2;
+  animation: theme-circle-expand 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  clip-path: circle(0 at var(--theme-x, 50%) var(--theme-y, 50%));
+}
+
+@keyframes theme-circle-expand {
+  from {
+    clip-path: circle(0 at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  to {
+    clip-path: circle(
+      var(--theme-r, 150vmax) at var(--theme-x, 50%) var(--theme-y, 50%)
+    );
+  }
+}
+
+/* Respeta usuarios que prefieren menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(root) {
+    animation: none;
+    clip-path: none;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   Premium: Glassmorphism, gradient borders, solar tech background
+   ──────────────────────────────────────────────────────────────── */
+
+/* Utility: glassmorphism card */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dark .glass {
+  background: rgba(33, 39, 78, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Glass premium con gradient sutil y sombra interna */
+.glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.4) 100%
+  );
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 4px 24px -8px rgba(33, 39, 78, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.dark .glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(33, 39, 78, 0.55) 0%,
+    rgba(26, 31, 61, 0.35) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 4px 24px -8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Glass fuerte para sidebar */
+.glass-sidebar {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-right: 1px solid rgba(255, 255, 255, 0.6);
+}
+.dark .glass-sidebar {
+  background: linear-gradient(
+    180deg,
+    rgba(22, 26, 51, 0.85) 0%,
+    rgba(15, 19, 38, 0.7) 100%
+  );
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Animated gradient text — para títulos hero */
+.gradient-text-windmar {
+  background: linear-gradient(
+    135deg,
+    #f89b24 0%,
+    #ffffff 35%,
+    #a6c3e6 65%,
+    #1d429b 100%
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-text-shift 10s ease infinite;
+}
+@keyframes gradient-text-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Pulse glow naranja (para destacar elementos importantes) */
+.pulse-glow-orange {
+  animation: pulse-glow-orange 3.5s ease-in-out infinite;
+}
+@keyframes pulse-glow-orange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 155, 36, 0.15); }
+  50% { box-shadow: 0 0 28px 6px rgba(248, 155, 36, 0.3); }
+}
+
+/* Floating subtle */
+.float-subtle {
+  animation: float-subtle 7s ease-in-out infinite;
+}
+@keyframes float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Card hover lift premium */
+.card-lift {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 40px -10px rgba(33, 39, 78, 0.25),
+    0 4px 12px -4px rgba(248, 155, 36, 0.15);
+}
+
+/* Animated border premium (conic gradient rotating) */
+@property --shimmer-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.shimmer-border {
+  position: relative;
+  isolation: isolate;
+}
+.shimmer-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--shimmer-angle),
+    transparent 0deg,
+    #f89b24 60deg,
+    transparent 120deg,
+    transparent 240deg,
+    #1d429b 300deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: shimmer-rotate 4s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+@keyframes shimmer-rotate {
+  to { --shimmer-angle: 360deg; }
+}
+
+/* Utility: gradient border (animated) */
+.gradient-border {
+  position: relative;
+  background: var(--card);
+  border-radius: 0.75rem;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    135deg,
+    var(--color-windmar-orange) 0%,
+    var(--color-windmar-blue) 50%,
+    var(--color-windmar-orange) 100%
+  );
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: gradient-shift 6s ease infinite;
+  pointer-events: none;
+}
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Solar tech animated background */
+.solar-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1f3d 0%, #21274e 50%, #1a1f3d 100%);
+}
+.solar-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(248, 155, 36, 0.25), transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(29, 66, 155, 0.35), transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(166, 195, 230, 0.1), transparent 60%);
+  animation: solar-pulse 12s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes solar-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+.solar-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Glow on hover */
+.glow-on-hover {
+  transition: box-shadow 0.4s ease, transform 0.2s ease;
+}
+.glow-on-hover:hover {
+  box-shadow: 0 0 30px -5px var(--color-windmar-orange);
+  transform: translateY(-2px);
+}
+
+/* Scrollbar sutil con identidad Windmar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   SOLAR EXECUTIVE — paleta + componentes ejecutivos
+   Estilo: Linear × Bloomberg × Tesla. Semi-neon naranja Windmar.
+   ──────────────────────────────────────────────────────────────── */
+
+/* Surface ejecutiva: card limpia con borde fino, sin radial backgrounds */
+.exec-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.dark .exec-card {
+  background: rgba(33, 39, 78, 0.55);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.exec-card:hover {
+  border-color: rgba(var(--field-accent-glow), 0.4);
+  box-shadow:
+    0 0 0 1px rgba(var(--field-accent-glow), 0.15),
+    0 8px 32px -12px rgba(var(--field-accent-glow), 0.2);
+}
+.dark .exec-card:hover {
+  box-shadow:
+    0 0 0 1px rgba(var(--field-accent-glow), 0.3),
+    0 12px 40px -12px rgba(var(--field-accent-glow), 0.18);
+}
+
+/* Variante: card destacada con glow naranja permanente sutil */
+.exec-card-hero {
+  background: linear-gradient(
+    135deg,
+    rgba(248, 155, 36, 0.06) 0%,
+    rgba(248, 155, 36, 0.02) 100%
+  );
+  border: 1px solid rgba(248, 155, 36, 0.3);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(248, 155, 36, 0.1),
+    0 8px 32px -16px rgba(248, 155, 36, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+.dark .exec-card-hero {
+  background: linear-gradient(
+    135deg,
+    rgba(248, 155, 36, 0.1) 0%,
+    rgba(33, 39, 78, 0.6) 100%
+  );
+  border: 1px solid rgba(248, 155, 36, 0.4);
+}
+
+/* Botón ejecutivo: ghost por defecto, fill solo en activo */
+.btn-exec {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.btn-exec:hover {
+  border-color: rgba(var(--field-accent-glow), 0.5);
+  background: rgba(var(--field-accent-glow), 0.06);
+  color: var(--foreground);
+}
+.btn-exec[data-active="true"] {
+  background: var(--field-accent);
+  border-color: var(--field-accent);
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(var(--field-accent-glow), 0.3),
+    0 4px 16px -4px rgba(var(--field-accent-glow), 0.4);
+}
+.btn-exec-primary {
+  background: var(--color-windmar-orange);
+  border-color: var(--color-windmar-orange);
+  color: #fff;
+}
+.btn-exec-primary:hover {
+  background: #ffaa3a;
+  border-color: #ffaa3a;
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(248, 155, 36, 0.4),
+    0 6px 20px -6px rgba(248, 155, 36, 0.5);
+}
+
+/* Input ejecutivo: fino, sin sombras, ring naranja en focus */
+.input-exec {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.input-exec:focus {
+  outline: none;
+  border-color: var(--field-accent);
+  box-shadow: 0 0 0 3px rgba(var(--field-accent-glow), 0.18);
+}
+
+/* Select: glass dark con chevron custom + options stylizadas */
+select.input-exec {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--card);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f89b24' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 12px;
+  padding-right: 1.75rem;
+  cursor: pointer;
+}
+.dark select.input-exec {
+  background-color: rgba(33, 39, 78, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+select.input-exec:hover {
+  border-color: rgba(var(--field-accent-glow), 0.4);
+}
+
+/* Options dentro del select — el browser limita estilos pero esto funciona en Chrome/Edge/Firefox */
+select.input-exec option {
+  background-color: var(--card);
+  color: var(--foreground);
+  padding: 0.5rem;
+  font-size: 0.8125rem;
+}
+.dark select.input-exec option {
+  background-color: #21274e;
+  color: #f1f5f9;
+}
+select.input-exec option:hover,
+select.input-exec option:focus,
+select.input-exec option:checked {
+  background: linear-gradient(0deg, rgba(248, 155, 36, 0.25), rgba(248, 155, 36, 0.25));
+  color: #ffffff;
+}
+
+/* Inputs date — look glass alineado con el dashboard */
+input[type="date"].input-exec {
+  color-scheme: light;
+  background-color: var(--card);
+  cursor: pointer;
+}
+.dark input[type="date"].input-exec {
+  color-scheme: dark;
+  background-color: rgba(33, 39, 78, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+input[type="date"].input-exec:hover {
+  border-color: rgba(var(--field-accent-glow), 0.4);
+}
+
+/* Ícono del calendario — Chrome / Edge / Safari */
+input[type="date"].input-exec::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.18s ease, filter 0.18s ease;
+  padding: 2px;
+  border-radius: 4px;
+}
+input[type="date"].input-exec::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: rgba(var(--field-accent-glow), 0.12);
+}
+/* En dark mode el ícono nativo es blanco → lo tintamos naranja suave */
+.dark input[type="date"].input-exec::-webkit-calendar-picker-indicator {
+  filter: invert(0.5) sepia(1) saturate(4) hue-rotate(355deg) brightness(0.9);
+  opacity: 0.6;
+}
+.dark input[type="date"].input-exec::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Texto interno: matching foreground */
+input[type="date"].input-exec::-webkit-datetime-edit {
+  color: var(--foreground);
+}
+input[type="date"].input-exec::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+input[type="date"].input-exec::-webkit-datetime-edit-text {
+  color: var(--muted-foreground);
+  padding: 0 2px;
+}
+/* Placeholder dd/mm/aaaa cuando está vacío */
+input[type="date"].input-exec:not(:focus):invalid::-webkit-datetime-edit {
+  color: var(--muted-foreground);
+}
+
+/* KPI number — Geist Mono con tracking ajustado */
+.kpi-number {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Label ejecutivo: caps con tracking ancho */
+.exec-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted-foreground);
+}
+
+/* Divider sutil con gradient naranja */
+.exec-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(248, 155, 36, 0.25) 50%,
+    transparent 100%
+  );
+}
+
+/* Semi-neon glow text (solo cuando es activo/seleccionado) */
+.neon-text-orange {
+  color: var(--color-windmar-orange);
+  text-shadow: 0 0 12px rgba(248, 155, 36, 0.4);
+}
+
+/* Chip de filtro: estilo Linear */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-variant-numeric: tabular-nums;
+}
+.filter-chip:hover {
+  border-color: rgba(var(--field-accent-glow), 0.4);
+  color: var(--foreground);
+}
+.filter-chip[data-active="true"] {
+  background: rgba(var(--field-accent-glow), 0.14);
+  border-color: rgba(var(--field-accent-glow), 0.5);
+  color: var(--field-accent);
+  box-shadow: 0 0 0 1px rgba(var(--field-accent-glow), 0.2);
+}
+.dark .filter-chip[data-active="true"] {
+  background: rgba(248, 155, 36, 0.18);
+  color: #ffb547;
+}
+
+/* Tabla ejecutiva: filas finas, hover sutil */
+.exec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.exec-table thead th {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-foreground);
+  padding: 0.75rem 0.875rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.02);
+}
+.dark .exec-table thead th {
+  background: rgba(255, 255, 255, 0.02);
+}
+.exec-table tbody td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.exec-table tbody tr {
+  transition: background 0.12s ease;
+}
+.exec-table tbody tr:hover {
+  background: rgba(248, 155, 36, 0.04);
+}
+.dark .exec-table tbody tr:hover {
+  background: rgba(248, 155, 36, 0.06);
+}
+
+/* Mini sparkline cell glow */
+.spark-glow {
+  filter: drop-shadow(0 0 4px rgba(248, 155, 36, 0.4));
+}
+
+/* ────────────────────────────────────────────────────────────────
+   CALENDAR PICKER — glass theme alineado al dashboard
+   ──────────────────────────────────────────────────────────────── */
+.wm-calendar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow:
+    0 12px 40px -10px rgba(33, 39, 78, 0.18),
+    0 0 0 1px rgba(248, 155, 36, 0.08);
+}
+.dark .wm-calendar {
+  background: rgba(22, 26, 51, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 16px 48px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(248, 155, 36, 0.12);
+}
+
+/* react-day-picker overrides — tamaño grande y solo dropdowns */
+.wm-calendar .rdp-root {
+  --rdp-accent-color: var(--color-windmar-orange);
+  --rdp-accent-background-color: rgba(248, 155, 36, 0.15);
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-day_button-border-radius: 10px;
+  --rdp-selected-border: 1px solid var(--color-windmar-orange);
+  --rdp-today-color: var(--color-windmar-orange);
+  --rdp-weekday-padding: 6px 0;
+  font-family: var(--font-sans), system-ui;
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.wm-calendar .rdp-months {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Ocultamos el caption-label duplicado (lo dejan los dropdowns) */
+.wm-calendar .rdp-caption_label {
+  display: none !important;
+}
+
+/* El month_caption envuelve los dropdowns y el label — solo padding */
+.wm-calendar .rdp-month_caption {
+  padding: 2px 4px 6px;
+}
+
+.wm-calendar .rdp-dropdowns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.wm-calendar .rdp-dropdown_root {
+  flex: 1;
+}
+
+.wm-calendar .rdp-dropdown,
+.wm-calendar select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 26px 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--foreground);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23f89b24' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+.wm-calendar .rdp-dropdown:hover,
+.wm-calendar select:hover {
+  border-color: rgba(248, 155, 36, 0.4);
+  background-color: rgba(248, 155, 36, 0.04);
+}
+.dark .wm-calendar .rdp-dropdown,
+.dark .wm-calendar select {
+  background-color: rgba(33, 39, 78, 0.5);
+}
+
+.wm-calendar .rdp-weekdays {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.wm-calendar .rdp-weekday {
+  padding: 6px 0;
+  text-align: center;
+  width: 40px;
+}
+
+.wm-calendar .rdp-day {
+  padding: 1px;
+}
+.wm-calendar .rdp-day_button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.15s ease;
+}
+.wm-calendar .rdp-day_button:hover {
+  background: rgba(248, 155, 36, 0.12);
+  border-color: rgba(248, 155, 36, 0.3);
+}
+.wm-calendar .rdp-day.rdp-today .rdp-day_button {
+  color: var(--color-windmar-orange);
+  font-weight: 700;
+  border-color: rgba(248, 155, 36, 0.35);
+}
+.wm-calendar .rdp-day.rdp-selected .rdp-day_button {
+  background: var(--color-windmar-orange);
+  color: #fff;
+  border-color: var(--color-windmar-orange);
+  box-shadow: 0 0 0 1px rgba(248, 155, 36, 0.3), 0 4px 12px -4px rgba(248, 155, 36, 0.5);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   AMBIENT BACKGROUND — orbes Windmar + grid sutil
+   Inspirado en el dashboard glass que mandaste, paleta oficial.
+   ──────────────────────────────────────────────────────────────── */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Grid sutil — solo dark mode */
+.ambient-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black, transparent);
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black, transparent);
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+.dark .ambient-bg::before {
+  opacity: 1;
+}
+
+/* Orbes con colores Windmar — muy sutiles, no brillan */
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  animation: orbFloat linear infinite;
+  will-change: transform;
+  opacity: 0;
+  transition: opacity 0.8s;
+}
+.dark .ambient-orb { opacity: 1; }
+
+.ambient-orb.orb-1 {
+  /* Naranja Windmar — reducido drásticamente para que no amarillee */
+  width: 380px; height: 380px;
+  top: -150px; left: -180px;
+  background: radial-gradient(circle, rgba(248, 155, 36, 0.08), transparent 70%);
+  animation-duration: 20s;
+}
+.ambient-orb.orb-2 {
+  /* Azul Windmar — un poco más visible, es el color base */
+  width: 420px; height: 420px;
+  top: 25%; right: -140px;
+  background: radial-gradient(circle, rgba(29, 66, 155, 0.18), transparent 70%);
+  animation-duration: 24s;
+  animation-delay: -8s;
+}
+.ambient-orb.orb-3 {
+  /* Light Blue — sutil */
+  width: 360px; height: 360px;
+  bottom: -120px; left: 30%;
+  background: radial-gradient(circle, rgba(166, 195, 230, 0.10), transparent 70%);
+  animation-duration: 18s;
+  animation-delay: -4s;
+}
+.ambient-orb.orb-4 {
+  /* Dark Blue — apoya el fondo, sin protagonismo */
+  width: 320px; height: 320px;
+  bottom: 22%; right: 22%;
+  background: radial-gradient(circle, rgba(33, 39, 78, 0.25), transparent 70%);
+  animation-duration: 22s;
+  animation-delay: -12s;
+}
+
+@keyframes orbFloat {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(30px, -40px) scale(1.05); }
+  50%  { transform: translate(-20px, 30px) scale(0.95); }
+  75%  { transform: translate(40px, 20px) scale(1.02); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* Slide-up entrance animation reutilizable */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* KPI number gradient blanco→gris para mejor contraste sobre glass dark */
+.dark .kpi-number {
+  background: linear-gradient(180deg, #ffffff 40%, rgba(255, 255, 255, 0.65));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* En light mode mantenemos color sólido para contraste */
+.kpi-number {
+  /* foreground en light, gradient en dark (override arriba) */
+}
+
+/* Reducir motion para usuarios sensibles */
+@media (prefers-reduced-motion: reduce) {
+  .ambient-orb { animation: none; }
+}
