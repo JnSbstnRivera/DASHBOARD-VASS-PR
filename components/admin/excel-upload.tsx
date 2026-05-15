@@ -88,34 +88,59 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
         throw new Error(`upload Storage: ${putRes.status} ${text.slice(0, 100)}`);
       }
 
-      // ── Paso 3: pedirle al servidor que procese el archivo desde Storage ──
+      // ── Paso 3: procesar en 2 fases para evitar OOM en Vercel ──
+      // Fase A: VENTAS + APOYO (~1300 filas, rápido)
+      // Fase B: SEGUIMIENTO (~3800 filas, más lento) — mismo archivo en Storage
       setEstado("saving");
       await new Promise((r) => setTimeout(r, 400));
 
-      const res = await fetch("/api/refresh/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: urlData.path, type: forceType ?? null }),
-      });
-
-      // Vercel puede devolver HTML cuando hay timeout (504) — protegemos el parse
-      let data: UploadResult;
-      const contentType = res.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/json")) {
-        const text = await res.text();
-        const isTimeout = text.includes("FUNCTION_INVOCATION_TIMEOUT") || res.status === 504;
-        data = {
-          ok: false,
-          error: isTimeout ? "TIMEOUT" : "SERVER_ERROR",
-          message: isTimeout
-            ? "El servidor tardó demasiado procesando el Excel (límite 60s en Vercel). Intentá de nuevo — los datos sí pueden haberse cargado."
-            : `El servidor devolvió un error (HTTP ${res.status}). Probá de nuevo.`,
-        };
-      } else {
-        data = await res.json();
+      async function processPhase(phase: "ventas" | "seguimiento", keepStorage: boolean): Promise<UploadResult> {
+        const r = await fetch("/api/refresh/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: urlData.path, phase, keepStorage }),
+        });
+        const ct = r.headers.get("content-type") ?? "";
+        if (!ct.includes("application/json")) {
+          const text = await r.text();
+          const isTimeout = text.includes("FUNCTION_INVOCATION_TIMEOUT") || r.status === 504;
+          return {
+            ok: false,
+            error: isTimeout ? "TIMEOUT" : "SERVER_ERROR",
+            message: isTimeout
+              ? `Fase ${phase}: el servidor tardó demasiado (60s). Algunos datos sí se cargaron.`
+              : `Fase ${phase}: HTTP ${r.status}. Probá de nuevo.`,
+          };
+        }
+        return r.json();
       }
 
-      if (!res.ok || !data.ok) {
+      // Fase 1: ventas (mantener archivo en Storage para 2da fase)
+      const ventasData = await processPhase("ventas", true);
+      if (!ventasData.ok) {
+        setResult(ventasData);
+        setEstado("error");
+        return;
+      }
+
+      // Fase 2: seguimiento (borrar archivo después)
+      const segData = await processPhase("seguimiento", false);
+
+      // Consolidar respuesta
+      const data: UploadResult = {
+        ok: segData.ok,
+        ventas: ventasData.ventas,
+        apoyoVentas: ventasData.apoyoVentas,
+        seguimiento: segData.seguimiento ?? 0,
+        mesesSeguimiento: segData.mesesSeguimiento ?? [],
+        descartados2025: (ventasData.descartados2025 ?? 0),
+        uploaded_at: ventasData.uploaded_at,
+        issues: [...(ventasData.issues ?? []), ...(segData.issues ?? [])],
+        sheetsEncontradas: segData.sheetsEncontradas ?? ventasData.sheetsEncontradas,
+        error: segData.error,
+        message: segData.message,
+      };
+      if (!data.ok) {
         setResult(data);
         setEstado("error");
         return;

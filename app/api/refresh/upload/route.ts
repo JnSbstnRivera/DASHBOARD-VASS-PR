@@ -66,10 +66,17 @@ export async function POST(req: Request) {
     const contentType = req.headers.get("content-type") ?? "";
     let buf: Buffer;
     let storagePath: string | null = null;
+    // phase: "ventas" (procesa VENTAS VASS + APOYO) | "seguimiento" (procesa pestañas mensuales) | undefined (todo)
+    let phase: "ventas" | "seguimiento" | "all" = "all";
+    let keepStorage = false;
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
       storagePath = body.path;
+      if (body.phase === "ventas" || body.phase === "seguimiento") {
+        phase = body.phase;
+      }
+      keepStorage = body.keepStorage === true;
       if (!storagePath) {
         return NextResponse.json(
           { ok: false, error: "MISSING_PATH", message: "Falta path del archivo en Storage" },
@@ -144,12 +151,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // ═══════ Fase 1: PARSEAR los 3 datasets EN MEMORIA (rápido, sin red) ═══════
+    // ═══════ Fase 1: PARSEAR según `phase` (solo lo necesario, ahorra memoria) ═══════
 
-    // VENTAS VASS
+    // VENTAS VASS — solo si phase=all o phase=ventas
     let ventasDescartadas2025 = 0;
     const ventasRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
-    if (present.has("VENTAS VASS")) {
+    if ((phase === "all" || phase === "ventas") && present.has("VENTAS VASS")) {
       const sheet = wb.Sheets["VENTAS VASS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
@@ -174,14 +181,14 @@ export async function POST(req: Request) {
           source_file: "VASS.xlsx",
         });
       }
-    } else {
+    } else if (phase === "all" || phase === "ventas") {
       issues.push({ sheet: "VENTAS VASS", problem: "missing_sheet" });
     }
 
-    // SEGUIMIENTO (pestañas mensuales)
+    // SEGUIMIENTO (pestañas mensuales) — solo si phase=all o phase=seguimiento
     const mesesEncontrados: string[] = [];
     const seguimientoRows: Database["vass"]["Tables"]["seguimiento"]["Insert"][] = [];
-    for (const sheetName of wb.SheetNames) {
+    if (phase === "all" || phase === "seguimiento") for (const sheetName of wb.SheetNames) {
       const upper = sheetName.trim().toUpperCase();
       if (!MESES_2026.includes(upper)) continue;
       mesesEncontrados.push(upper);
@@ -212,8 +219,9 @@ export async function POST(req: Request) {
     }
 
     // APOYO VENTAS → se mete dentro de vass.ventas con tipo_asistencia="APOYO VENTAS"
+    // Solo si phase=all o phase=ventas
     const apoyoRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
-    if (present.has("APOYO VENTAS")) {
+    if ((phase === "all" || phase === "ventas") && present.has("APOYO VENTAS")) {
       const sheet = wb.Sheets["APOYO VENTAS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
@@ -277,8 +285,8 @@ export async function POST(req: Request) {
       notas: `${ventasInserted} ventas + ${seguimientoInserted} seguimiento (${mesesEncontrados.join(", ")}) + ${apoyoInserted} apoyo`,
     });
 
-    // Cleanup: borrar el archivo del Storage después de procesar
-    if (storagePath) {
+    // Cleanup: borrar el archivo del Storage después de procesar (a menos que el cliente pida mantenerlo)
+    if (storagePath && !keepStorage) {
       const cleanupClient = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -289,6 +297,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
+      phase,
       ventas: ventasInserted,
       seguimiento: seguimientoInserted,
       apoyoVentas: apoyoInserted,
