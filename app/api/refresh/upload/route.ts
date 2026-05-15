@@ -70,8 +70,27 @@ export async function POST(req: Request) {
       );
     }
 
+    const t0 = Date.now();
     const buf = Buffer.from(await file.arrayBuffer());
-    const wb = XLSX.read(buf, { type: "buffer", cellDates: false });
+    console.log(`[upload] file received ${buf.length} bytes in ${Date.now() - t0}ms`);
+
+    const t1 = Date.now();
+    // Solo parseamos las hojas que nos interesan — descarta pivot/aux tables
+    const HOJAS_NECESARIAS = [
+      "VENTAS VASS", "APOYO VENTAS",
+      "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO",
+      "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+    ];
+    const wb = XLSX.read(buf, {
+      type: "buffer",
+      cellDates: false,
+      cellHTML: false,
+      cellFormula: false,
+      cellStyles: false,
+      cellNF: false,
+      sheets: HOJAS_NECESARIAS,
+    });
+    console.log(`[upload] xlsx parsed in ${Date.now() - t1}ms · sheets: ${wb.SheetNames.join(", ")}`);
     const present = new Set(wb.SheetNames);
 
     const issues: { sheet: string; problem: string; columns?: string[] }[] = [];
