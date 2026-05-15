@@ -73,7 +73,23 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
       const res = await fetch("/api/refresh/upload", { method: "POST", body: form });
       setEstado("saving");
       await new Promise((r) => setTimeout(r, 400));
-      const data: UploadResult = await res.json();
+
+      // Vercel puede devolver HTML cuando hay timeout (504) — protegemos el parse
+      let data: UploadResult;
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        const isTimeout = text.includes("FUNCTION_INVOCATION_TIMEOUT") || res.status === 504;
+        data = {
+          ok: false,
+          error: isTimeout ? "TIMEOUT" : "SERVER_ERROR",
+          message: isTimeout
+            ? "El servidor tardó demasiado procesando el Excel (límite 60s en Vercel). Intentá de nuevo — los datos sí se cargan, sólo no alcanza a devolver respuesta."
+            : `El servidor devolvió un error (HTTP ${res.status}). Probá de nuevo.`,
+        };
+      } else {
+        data = await res.json();
+      }
 
       if (!res.ok || !data.ok) {
         setResult(data);

@@ -77,18 +77,44 @@ export async function POST(req: Request) {
     const issues: { sheet: string; problem: string; columns?: string[] }[] = [];
     const supa = supabaseAdmin();
 
-    // ═══════ VENTAS VASS ═══════
-    let ventasInserted = 0;
+    // Helper: inserta filas en paralelo, batches grandes (Supabase soporta hasta 1000)
+    async function insertParallel<T>(
+      table: "ventas" | "seguimiento",
+      rows: T[],
+      batchSize = 500,
+    ) {
+      if (rows.length === 0) return;
+      const batches: T[][] = [];
+      for (let i = 0; i < rows.length; i += batchSize) {
+        batches.push(rows.slice(i, i + batchSize));
+      }
+      // Limitamos paralelismo a 4 para no saturar Supabase
+      const CONCURRENCY = 4;
+      for (let i = 0; i < batches.length; i += CONCURRENCY) {
+        const slice = batches.slice(i, i + CONCURRENCY);
+        await Promise.all(
+          slice.map((b) =>
+            supa.from(table).insert(b as never).then(({ error }) => {
+              if (error) throw new Error(`insertando ${table}: ${error.message}`);
+            }),
+          ),
+        );
+      }
+    }
+
+    // ═══════ Fase 1: PARSEAR los 3 datasets EN MEMORIA (rápido, sin red) ═══════
+
+    // VENTAS VASS
     let ventasDescartadas2025 = 0;
+    const ventasRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
     if (present.has("VENTAS VASS")) {
       const sheet = wb.Sheets["VENTAS VASS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
-      const rows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
       for (const r of raw) {
         const closing = serialToISO(r["CLOSING DATE"]);
         if (!closing) continue;
         if (!isAfter2026(closing)) { ventasDescartadas2025++; continue; }
-        rows.push({
+        ventasRows.push({
           mes: normMes(r["MES"]),
           producto: asText(r["PRODUCTO"]),
           procedencia: asText(r["Procedencia"] ?? r["PROCEDENCIA"]),
@@ -106,55 +132,35 @@ export async function POST(req: Request) {
           source_file: "VASS.xlsx",
         });
       }
-      if (rows.length > 0) {
-        const { error: delErr } = await supa.from("ventas").delete().gte("id", 0);
-        if (delErr) throw new Error(`limpiando ventas: ${delErr.message}`);
-        const BATCH = 100;
-        for (let i = 0; i < rows.length; i += BATCH) {
-          const { error } = await supa.from("ventas").insert(rows.slice(i, i + BATCH));
-          if (error) throw new Error(`insertando ventas (lote ${i}): ${error.message}`);
-        }
-        ventasInserted = rows.length;
-      }
     } else {
       issues.push({ sheet: "VENTAS VASS", problem: "missing_sheet" });
     }
 
-    // ═══════ SEGUIMIENTO (todas las pestañas mensuales 2026) ═══════
-    let seguimientoInserted = 0;
+    // SEGUIMIENTO (pestañas mensuales)
     const mesesEncontrados: string[] = [];
-    const allSeguimientoRows: Database["vass"]["Tables"]["seguimiento"]["Insert"][] = [];
-
+    const seguimientoRows: Database["vass"]["Tables"]["seguimiento"]["Insert"][] = [];
     for (const sheetName of wb.SheetNames) {
       const upper = sheetName.trim().toUpperCase();
       if (!MESES_2026.includes(upper)) continue;
       mesesEncontrados.push(upper);
-
       const sheet = wb.Sheets[sheetName];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
-
       for (const r of raw) {
         const fecha = serialToISO(r["FECHA"] ?? r["Fecha"]);
         if (!fecha || !isAfter2026(fecha)) continue;
-        allSeguimientoRows.push({
+        seguimientoRows.push({
           hoja_origen: upper,
           mes: normMes(r["MES"] ?? r["Mes"]),
           fecha,
           procedencia: asText(r["PROCEDENCIA"] ?? r["Procedencia"]),
-          asesor: asText(
-            r["ASESOR"] ?? r["ASCESOR"] ?? r["AGENTE"] ?? r["Maria Paula"]
-          ),
+          asesor: asText(r["ASESOR"] ?? r["ASCESOR"] ?? r["AGENTE"] ?? r["Maria Paula"]),
           lead_numero: asText(r["LEAD"]),
           producto: asText(r["PRODUCTO"] ?? r["Producto"]),
           financiamiento: asText(r["FINANCIAMIENTO"] ?? r["Financiamiento"]),
-          id_aplicacion: asText(
-            r["ID APLICACION"] ?? r["ID APLICACIÓN"] ?? r["Numero de Aplicacion"]
-          ),
+          id_aplicacion: asText(r["ID APLICACION"] ?? r["ID APLICACIÓN"] ?? r["Numero de Aplicacion"]),
           consultor: asText(r["CONSULTOR"] ?? r["NOMBRE CONSULTOR"]),
           cliente: asText(r["CLIENTE"] ?? r["NOMBRE CLIENTE"]),
-          telefono: asText(
-            r["TELEFONO DE CLIENTE"] ?? r["TELEFONO CLIENTE"] ?? r["TELEFONO"]
-          ),
+          telefono: asText(r["TELEFONO DE CLIENTE"] ?? r["TELEFONO CLIENTE"] ?? r["TELEFONO"]),
           status: asText(r["STATUS"]),
           observacion: asText(r["OBSERVACION"] ?? r["OBSERVACION "] ?? r["OBSERVACIÓN"]),
           seguimiento_extra: asText(r["Seguimiento"] ?? r["Seguimiento "]),
@@ -163,27 +169,15 @@ export async function POST(req: Request) {
       }
     }
 
-    if (allSeguimientoRows.length > 0) {
-      const { error: delErr } = await supa.from("seguimiento").delete().gte("id", 0);
-      if (delErr) throw new Error(`limpiando seguimiento: ${delErr.message}`);
-      const BATCH = 200;
-      for (let i = 0; i < allSeguimientoRows.length; i += BATCH) {
-        const { error } = await supa.from("seguimiento").insert(allSeguimientoRows.slice(i, i + BATCH));
-        if (error) throw new Error(`insertando seguimiento (lote ${i}): ${error.message}`);
-      }
-      seguimientoInserted = allSeguimientoRows.length;
-    }
-
-    // ═══════ APOYO VENTAS → se mete dentro de vass.ventas con tipo_asistencia="APOYO VENTAS" ═══════
-    let apoyoInserted = 0;
+    // APOYO VENTAS → se mete dentro de vass.ventas con tipo_asistencia="APOYO VENTAS"
+    const apoyoRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
     if (present.has("APOYO VENTAS")) {
       const sheet = wb.Sheets["APOYO VENTAS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
-      const rows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
       for (const r of raw) {
         const closing = serialToISO(r["CLOSING DATE"]);
         if (!closing || !isAfter2026(closing)) continue;
-        rows.push({
+        apoyoRows.push({
           mes: normMes(r["MES"]),
           producto: asText(r["PRODUCTO"]),
           procedencia: asText(r["Procedencia"] ?? r["PROCEDENCIA"]),
@@ -201,17 +195,33 @@ export async function POST(req: Request) {
           source_file: "VASS.xlsx",
         });
       }
-      if (rows.length > 0) {
-        const BATCH = 100;
-        for (let i = 0; i < rows.length; i += BATCH) {
-          const { error } = await supa.from("ventas").insert(rows.slice(i, i + BATCH));
-          if (error) throw new Error(`insertando apoyo en ventas (lote ${i}): ${error.message}`);
-        }
-        apoyoInserted = rows.length;
-      }
     } else {
       issues.push({ sheet: "APOYO VENTAS", problem: "missing_sheet" });
     }
+
+    // ═══════ Fase 2: TRUNCATE en paralelo ═══════
+    await Promise.all([
+      ventasRows.length + apoyoRows.length > 0
+        ? supa.from("ventas").delete().gte("id", 0).then(({ error }) => {
+            if (error) throw new Error(`limpiando ventas: ${error.message}`);
+          })
+        : Promise.resolve(),
+      seguimientoRows.length > 0
+        ? supa.from("seguimiento").delete().gte("id", 0).then(({ error }) => {
+            if (error) throw new Error(`limpiando seguimiento: ${error.message}`);
+          })
+        : Promise.resolve(),
+    ]);
+
+    // ═══════ Fase 3: INSERT en paralelo (3 tablas + batches grandes en paralelo) ═══════
+    await Promise.all([
+      insertParallel("ventas", [...ventasRows, ...apoyoRows]),
+      insertParallel("seguimiento", seguimientoRows),
+    ]);
+
+    const ventasInserted = ventasRows.length;
+    const apoyoInserted = apoyoRows.length;
+    const seguimientoInserted = seguimientoRows.length;
 
     await supa.from("upload_log").insert({
       archivo: "VASS.xlsx",
