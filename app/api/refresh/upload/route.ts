@@ -61,18 +61,52 @@ function supabaseAdmin() {
 
 export async function POST(req: Request) {
   try {
-    const form = await req.formData();
-    const file = form.get("file");
-    if (!file || !(file instanceof Blob)) {
-      return NextResponse.json(
-        { ok: false, error: "MISSING_FILE", message: "Falta el archivo VASS.xlsx" },
-        { status: 400 },
-      );
-    }
+    // Modo 1 (nuevo): JSON con { path } — descarga del Supabase Storage
+    // Modo 2 (legacy): FormData con file directo (para archivos chicos / dev)
+    const contentType = req.headers.get("content-type") ?? "";
+    let buf: Buffer;
+    let storagePath: string | null = null;
 
-    const t0 = Date.now();
-    const buf = Buffer.from(await file.arrayBuffer());
-    console.log(`[upload] file received ${buf.length} bytes in ${Date.now() - t0}ms`);
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      storagePath = body.path;
+      if (!storagePath) {
+        return NextResponse.json(
+          { ok: false, error: "MISSING_PATH", message: "Falta path del archivo en Storage" },
+          { status: 400 },
+        );
+      }
+      const t0 = Date.now();
+      const storageClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } },
+      );
+      const { data: blob, error: dlErr } = await storageClient.storage
+        .from("vass-uploads")
+        .download(storagePath);
+      if (dlErr || !blob) {
+        return NextResponse.json(
+          { ok: false, error: "STORAGE_DOWNLOAD", message: dlErr?.message ?? "no blob" },
+          { status: 500 },
+        );
+      }
+      buf = Buffer.from(await blob.arrayBuffer());
+      console.log(`[upload] downloaded ${buf.length} bytes from Storage in ${Date.now() - t0}ms`);
+    } else {
+      // Modo legacy
+      const form = await req.formData();
+      const file = form.get("file");
+      if (!file || !(file instanceof Blob)) {
+        return NextResponse.json(
+          { ok: false, error: "MISSING_FILE", message: "Falta el archivo VASS.xlsx" },
+          { status: 400 },
+        );
+      }
+      const t0 = Date.now();
+      buf = Buffer.from(await file.arrayBuffer());
+      console.log(`[upload] file received ${buf.length} bytes in ${Date.now() - t0}ms`);
+    }
 
     const t1 = Date.now();
     // Solo parseamos las hojas que nos interesan — descarta pivot/aux tables
@@ -242,6 +276,16 @@ export async function POST(req: Request) {
       uploaded_by: "web-upload",
       notas: `${ventasInserted} ventas + ${seguimientoInserted} seguimiento (${mesesEncontrados.join(", ")}) + ${apoyoInserted} apoyo`,
     });
+
+    // Cleanup: borrar el archivo del Storage después de procesar
+    if (storagePath) {
+      const cleanupClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } },
+      );
+      await cleanupClient.storage.from("vass-uploads").remove([storagePath]);
+    }
 
     return NextResponse.json({
       ok: true,

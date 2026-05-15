@@ -66,13 +66,37 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
     setEstado("parsing");
 
     try {
-      const form = new FormData();
-      form.append("file", file);
-      if (forceType) form.append("type", forceType);
+      // ── Paso 1: pedir signed URL para subir directo a Supabase Storage ──
+      const urlRes = await fetch("/api/refresh/get-upload-url", { method: "POST" });
+      if (!urlRes.ok) {
+        const text = await urlRes.text();
+        throw new Error(`signed URL: ${urlRes.status} ${text.slice(0, 100)}`);
+      }
+      const urlData: { ok: boolean; path: string; signedUrl: string; token: string; message?: string } = await urlRes.json();
+      if (!urlData.ok) throw new Error(urlData.message ?? "no signed url");
 
-      const res = await fetch("/api/refresh/upload", { method: "POST", body: form });
+      // ── Paso 2: subir archivo directo a Supabase (no pasa por Vercel) ──
+      const putRes = await fetch(urlData.signedUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      });
+      if (!putRes.ok) {
+        const text = await putRes.text();
+        throw new Error(`upload Storage: ${putRes.status} ${text.slice(0, 100)}`);
+      }
+
+      // ── Paso 3: pedirle al servidor que procese el archivo desde Storage ──
       setEstado("saving");
       await new Promise((r) => setTimeout(r, 400));
+
+      const res = await fetch("/api/refresh/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: urlData.path, type: forceType ?? null }),
+      });
 
       // Vercel puede devolver HTML cuando hay timeout (504) — protegemos el parse
       let data: UploadResult;
@@ -84,7 +108,7 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
           ok: false,
           error: isTimeout ? "TIMEOUT" : "SERVER_ERROR",
           message: isTimeout
-            ? "El servidor tardó demasiado procesando el Excel (límite 60s en Vercel). Intentá de nuevo — los datos sí se cargan, sólo no alcanza a devolver respuesta."
+            ? "El servidor tardó demasiado procesando el Excel (límite 60s en Vercel). Intentá de nuevo — los datos sí pueden haberse cargado."
             : `El servidor devolvió un error (HTTP ${res.status}). Probá de nuevo.`,
         };
       } else {
