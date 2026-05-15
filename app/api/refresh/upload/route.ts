@@ -77,28 +77,17 @@ export async function POST(req: Request) {
     const issues: { sheet: string; problem: string; columns?: string[] }[] = [];
     const supa = supabaseAdmin();
 
-    // Helper: inserta filas en paralelo, batches grandes (Supabase soporta hasta 1000)
-    async function insertParallel<T>(
+    // Helper: inserta filas en batches secuenciales pero grandes (500 cabe en 1 req)
+    async function insertBatched<T>(
       table: "ventas" | "seguimiento",
       rows: T[],
       batchSize = 500,
     ) {
       if (rows.length === 0) return;
-      const batches: T[][] = [];
       for (let i = 0; i < rows.length; i += batchSize) {
-        batches.push(rows.slice(i, i + batchSize));
-      }
-      // Limitamos paralelismo a 4 para no saturar Supabase
-      const CONCURRENCY = 4;
-      for (let i = 0; i < batches.length; i += CONCURRENCY) {
-        const slice = batches.slice(i, i + CONCURRENCY);
-        await Promise.all(
-          slice.map((b) =>
-            supa.from(table).insert(b as never).then(({ error }) => {
-              if (error) throw new Error(`insertando ${table}: ${error.message}`);
-            }),
-          ),
-        );
+        const chunk = rows.slice(i, i + batchSize);
+        const { error } = await supa.from(table).insert(chunk as never);
+        if (error) throw new Error(`insertando ${table} (lote ${i}): ${error.message}`);
       }
     }
 
@@ -199,24 +188,29 @@ export async function POST(req: Request) {
       issues.push({ sheet: "APOYO VENTAS", problem: "missing_sheet" });
     }
 
-    // ═══════ Fase 2: TRUNCATE en paralelo ═══════
+    // ═══════ Fase 2: TRUNCATE en paralelo (RPC en public, instantáneo) ═══════
+    const rpcClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
     await Promise.all([
       ventasRows.length + apoyoRows.length > 0
-        ? supa.from("ventas").delete().gte("id", 0).then(({ error }) => {
-            if (error) throw new Error(`limpiando ventas: ${error.message}`);
+        ? rpcClient.rpc("vass_truncate_ventas").then(({ error }) => {
+            if (error) throw new Error(`truncate ventas: ${error.message}`);
           })
         : Promise.resolve(),
       seguimientoRows.length > 0
-        ? supa.from("seguimiento").delete().gte("id", 0).then(({ error }) => {
-            if (error) throw new Error(`limpiando seguimiento: ${error.message}`);
+        ? rpcClient.rpc("vass_truncate_seguimiento").then(({ error }) => {
+            if (error) throw new Error(`truncate seguimiento: ${error.message}`);
           })
         : Promise.resolve(),
     ]);
 
-    // ═══════ Fase 3: INSERT en paralelo (3 tablas + batches grandes en paralelo) ═══════
+    // ═══════ Fase 3: INSERT — paralelo entre tablas, secuencial dentro de cada tabla ═══════
     await Promise.all([
-      insertParallel("ventas", [...ventasRows, ...apoyoRows]),
-      insertParallel("seguimiento", seguimientoRows),
+      insertBatched("ventas", [...ventasRows, ...apoyoRows]),
+      insertBatched("seguimiento", seguimientoRows),
     ]);
 
     const ventasInserted = ventasRows.length;
