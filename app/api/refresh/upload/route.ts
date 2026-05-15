@@ -154,11 +154,14 @@ export async function POST(req: Request) {
     // ═══════ Fase 1: PARSEAR según `phase` (solo lo necesario, ahorra memoria) ═══════
 
     // VENTAS VASS — solo si phase=all o phase=ventas
+    const tVentas = Date.now();
     let ventasDescartadas2025 = 0;
     const ventasRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
     if ((phase === "all" || phase === "ventas") && present.has("VENTAS VASS")) {
       const sheet = wb.Sheets["VENTAS VASS"];
+      console.log(`[upload] parsing VENTAS VASS sheet (phase=${phase})`);
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
+      console.log(`[upload] VENTAS VASS rows raw=${raw.length}`);
       for (const r of raw) {
         const closing = serialToISO(r["CLOSING DATE"]);
         if (!closing) continue;
@@ -184,6 +187,7 @@ export async function POST(req: Request) {
     } else if (phase === "all" || phase === "ventas") {
       issues.push({ sheet: "VENTAS VASS", problem: "missing_sheet" });
     }
+    console.log(`[upload] VENTAS VASS parsed in ${Date.now() - tVentas}ms · ventasRows=${ventasRows.length} descartadas=${ventasDescartadas2025}`);
 
     // SEGUIMIENTO (pestañas mensuales) — solo si phase=all o phase=seguimiento
     const mesesEncontrados: string[] = [];
@@ -249,7 +253,8 @@ export async function POST(req: Request) {
       issues.push({ sheet: "APOYO VENTAS", problem: "missing_sheet" });
     }
 
-    // ═══════ Fase 2: TRUNCATE en paralelo (RPC en public, instantáneo) ═══════
+    // ═══════ Fase 2: TRUNCATE (RPC, instantáneo) ═══════
+    const tTrunc = Date.now();
     const rpcClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -267,12 +272,15 @@ export async function POST(req: Request) {
           })
         : Promise.resolve(),
     ]);
+    console.log(`[upload] TRUNCATE done in ${Date.now() - tTrunc}ms`);
 
-    // ═══════ Fase 3: INSERT — paralelo entre tablas, secuencial dentro de cada tabla ═══════
+    // ═══════ Fase 3: INSERT ═══════
+    const tIns = Date.now();
     await Promise.all([
       insertBatched("ventas", [...ventasRows, ...apoyoRows]),
       insertBatched("seguimiento", seguimientoRows),
     ]);
+    console.log(`[upload] INSERT done in ${Date.now() - tIns}ms (ventas=${ventasRows.length + apoyoRows.length}, seg=${seguimientoRows.length})`);
 
     const ventasInserted = ventasRows.length;
     const apoyoInserted = apoyoRows.length;
