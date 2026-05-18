@@ -48,6 +48,23 @@ function isAfter2026(iso: string | null): boolean {
   return iso >= CORTE_2026;
 }
 
+/**
+ * Excel a veces guarda un rango !ref que se extiende hasta XFD (16384 cols)
+ * aunque solo haya datos en las primeras N columnas. Eso hace que
+ * sheet_to_json genere miles de keys vacías por fila (__EMPTY_*) y agote
+ * la memoria del lambda de Vercel.
+ *
+ * Esta función recorta el rango a maxCols columnas antes de parsear.
+ */
+function clipSheetCols(sheet: XLSX.WorkSheet, maxCols: number): void {
+  if (!sheet["!ref"]) return;
+  const range = XLSX.utils.decode_range(sheet["!ref"]);
+  if (range.e.c > maxCols - 1) {
+    range.e.c = maxCols - 1;
+    sheet["!ref"] = XLSX.utils.encode_range(range);
+  }
+}
+
 function supabaseAdmin() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -120,6 +137,7 @@ export async function POST(req: Request) {
     const ventasRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
     if (!onlySeguimiento && present.has("VENTAS VASS")) {
       const sheet = wb.Sheets["VENTAS VASS"];
+      clipSheetCols(sheet, 30);
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
         const closing = serialToISO(r["CLOSING DATE"]);
@@ -155,6 +173,7 @@ export async function POST(req: Request) {
       if (!MESES_2026.includes(upper)) continue;
       mesesEncontrados.push(upper);
       const sheet = wb.Sheets[sheetName];
+      clipSheetCols(sheet, 30);
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
         const fecha = serialToISO(r["FECHA"] ?? r["Fecha"]);
@@ -185,6 +204,7 @@ export async function POST(req: Request) {
     const apoyoRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
     if (!onlySeguimiento && present.has("APOYO VENTAS")) {
       const sheet = wb.Sheets["APOYO VENTAS"];
+      clipSheetCols(sheet, 30);
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
         const closing = serialToISO(r["CLOSING DATE"]);
