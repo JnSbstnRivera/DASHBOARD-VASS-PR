@@ -50,10 +50,18 @@ export function AdminPanel({
         </p>
       </motion.header>
 
-      <ExcelUpload
-        title="VASS.xlsx · Ventas + Seguimiento mensual + Apoyo"
-        subtitle="Soltá el Excel completo. El sistema carga VENTAS VASS, las pestañas mensuales (Enero, Febrero, ...) consolidadas, y APOYO VENTAS. Filas anteriores a 2026-01-01 se descartan."
-      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ExcelUpload
+          forceType="ventas"
+          title="VENTAS · pestaña VENTAS VASS"
+          subtitle="Soltá un Excel con solo la pestaña VENTAS VASS. Reemplaza la tabla de ventas. El seguimiento queda intacto."
+        />
+        <ExcelUpload
+          forceType="seguimiento"
+          title="SEGUIMIENTO · pestañas mensuales"
+          subtitle="Soltá un Excel con las pestañas ENERO, FEBRERO, ..., MAYO. Reemplaza la tabla de seguimiento. Las ventas quedan intactas."
+        />
+      </div>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <AdminKpi label="Ventas VASS" value={stats.ventas} icon={BarChart3} hero sub={`última: ${fmtDate(stats.ultimaVenta)}`} />

@@ -16,7 +16,6 @@ type UploadResult = {
   ok: boolean;
   ventas?: number;
   seguimiento?: number;
-  apoyoVentas?: number;
   mesesSeguimiento?: string[];
   descartados2025?: number;
   uploaded_at?: string;
@@ -280,10 +279,9 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
                   {new Date(result.uploaded_at ?? Date.now()).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
                   <Stat label="Ventas VASS" value={result.ventas ?? 0} emerald />
                   <Stat label="Seguimiento" value={result.seguimiento ?? 0} />
-                  <Stat label="Apoyo Ventas" value={result.apoyoVentas ?? 0} />
                   <Stat label="Descartados 2025" value={result.descartados2025 ?? 0} amber />
                 </div>
 

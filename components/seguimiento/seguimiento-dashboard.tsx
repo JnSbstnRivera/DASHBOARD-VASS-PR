@@ -212,10 +212,28 @@ export function SeguimientoDashboard({ initialSeguimiento }: Props) {
   }, [filtered, showDaily, volumenMes]);
 
   const asesoresUnicos = useMemo(() => {
+    const today = new Date();
+    let from: Date | null = null;
+    let to: Date | null = null;
+    if (preset === "thisMonth") {
+      from = startOfMonth(today);
+      to = endOfMonth(today);
+    } else if (preset === "custom") {
+      if (customFrom) from = parseISO(customFrom);
+      if (customTo) to = endOfDay(parseISO(customTo));
+    }
     const set = new Set<string>();
-    for (const r of initialSeguimiento) if (r.asesor) set.add(r.asesor);
+    for (const r of initialSeguimiento) {
+      if (!r.asesor) continue;
+      if (!r.fecha) continue;
+      const d = parseISO(r.fecha);
+      if (!isValid(d)) continue;
+      if (from && d < startOfDay(from)) continue;
+      if (to && d > to) continue;
+      set.add(r.asesor);
+    }
     return [...set].sort();
-  }, [initialSeguimiento]);
+  }, [initialSeguimiento, preset, customFrom, customTo]);
 
   const hojasUnicas = useMemo(() => {
     const set = new Set<string>();

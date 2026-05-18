@@ -209,10 +209,28 @@ export function VentasDashboard({ initialVentas }: Props) {
   }, [filtered, showDaily]);
 
   const asesoresUnicos = useMemo(() => {
+    const today = new Date();
+    let from: Date | null = null;
+    let to: Date | null = null;
+    if (preset === "thisMonth") {
+      from = startOfMonth(today);
+      to = endOfMonth(today);
+    } else if (preset === "custom") {
+      if (customFrom) from = parseISO(customFrom);
+      if (customTo) to = endOfDay(parseISO(customTo));
+    }
     const set = new Set<string>();
-    for (const v of initialVentas) if (v.asesor) set.add(v.asesor);
+    for (const v of initialVentas) {
+      if (!v.asesor) continue;
+      if (!v.closing_date) continue;
+      const d = parseISO(v.closing_date);
+      if (!isValid(d)) continue;
+      if (from && d < startOfDay(from)) continue;
+      if (to && d > to) continue;
+      set.add(v.asesor);
+    }
     return [...set].sort();
-  }, [initialVentas]);
+  }, [initialVentas, preset, customFrom, customTo]);
 
   function toggleAsesor(a: string) {
     const next = new Set(selectedAsesores);

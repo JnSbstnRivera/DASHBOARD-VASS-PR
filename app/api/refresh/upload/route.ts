@@ -63,6 +63,10 @@ export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const file = form.get("file");
+    // type: "ventas" → solo VENTAS VASS · "seguimiento" → solo meses · null/all → ambos
+    const typeRaw = (form.get("type") as string | null)?.toLowerCase() ?? "all";
+    const onlyVentas = typeRaw === "ventas";
+    const onlySeguimiento = typeRaw === "seguimiento";
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json(
         { ok: false, error: "MISSING_FILE", message: "Falta el archivo VASS.xlsx" },
@@ -71,7 +75,7 @@ export async function POST(req: Request) {
     }
     const t0 = Date.now();
     const buf = Buffer.from(await file.arrayBuffer());
-    console.log(`[upload] file received ${buf.length} bytes in ${Date.now() - t0}ms`);
+    console.log(`[upload] file received ${buf.length} bytes (type=${typeRaw}) in ${Date.now() - t0}ms`);
 
     const t1 = Date.now();
     // Solo parseamos las hojas que nos interesan — descarta pivot/aux tables
@@ -111,10 +115,10 @@ export async function POST(req: Request) {
 
     // ═══════ Fase 1: PARSEAR según `phase` (solo lo necesario, ahorra memoria) ═══════
 
-    // VENTAS VASS
+    // VENTAS VASS (procesa solo si no es onlySeguimiento)
     let ventasDescartadas2025 = 0;
     const ventasRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
-    if (present.has("VENTAS VASS")) {
+    if (!onlySeguimiento && present.has("VENTAS VASS")) {
       const sheet = wb.Sheets["VENTAS VASS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
@@ -139,14 +143,14 @@ export async function POST(req: Request) {
           source_file: "VASS.xlsx",
         });
       }
-    } else {
+    } else if (!onlySeguimiento) {
       issues.push({ sheet: "VENTAS VASS", problem: "missing_sheet" });
     }
 
-    // SEGUIMIENTO (pestañas mensuales)
+    // SEGUIMIENTO (pestañas mensuales) — solo si no es onlyVentas
     const mesesEncontrados: string[] = [];
     const seguimientoRows: Database["vass"]["Tables"]["seguimiento"]["Insert"][] = [];
-    for (const sheetName of wb.SheetNames) {
+    if (!onlyVentas) for (const sheetName of wb.SheetNames) {
       const upper = sheetName.trim().toUpperCase();
       if (!MESES_2026.includes(upper)) continue;
       mesesEncontrados.push(upper);
@@ -177,8 +181,9 @@ export async function POST(req: Request) {
     }
 
     // APOYO VENTAS → se mete dentro de vass.ventas con tipo_asistencia="APOYO VENTAS"
+    // (procesa solo si no es onlySeguimiento; tampoco lo marca como issue si falta — es opcional)
     const apoyoRows: Database["vass"]["Tables"]["ventas"]["Insert"][] = [];
-    if (present.has("APOYO VENTAS")) {
+    if (!onlySeguimiento && present.has("APOYO VENTAS")) {
       const sheet = wb.Sheets["APOYO VENTAS"];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
       for (const r of raw) {
@@ -202,9 +207,8 @@ export async function POST(req: Request) {
           source_file: "VASS.xlsx",
         });
       }
-    } else {
-      issues.push({ sheet: "APOYO VENTAS", problem: "missing_sheet" });
     }
+    // (APOYO VENTAS es opcional, no se marca como issue si falta)
 
     // ═══════ Fase 2: DELETE (limpia tablas) ═══════
     await Promise.all([
@@ -230,18 +234,18 @@ export async function POST(req: Request) {
     const apoyoInserted = apoyoRows.length;
     const seguimientoInserted = seguimientoRows.length;
 
+    const ventasTotalInserted = ventasInserted + apoyoInserted;
     await supa.from("upload_log").insert({
       archivo: "VASS.xlsx",
-      filas_cargadas: ventasInserted + seguimientoInserted + apoyoInserted,
+      filas_cargadas: ventasTotalInserted + seguimientoInserted,
       uploaded_by: "web-upload",
-      notas: `${ventasInserted} ventas + ${seguimientoInserted} seguimiento (${mesesEncontrados.join(", ")}) + ${apoyoInserted} apoyo`,
+      notas: `${ventasTotalInserted} ventas + ${seguimientoInserted} seguimiento (${mesesEncontrados.join(", ")})`,
     });
 
     return NextResponse.json({
       ok: true,
-      ventas: ventasInserted,
+      ventas: ventasTotalInserted,
       seguimiento: seguimientoInserted,
-      apoyoVentas: apoyoInserted,
       mesesSeguimiento: mesesEncontrados,
       descartados2025: ventasDescartadas2025,
       uploaded_at: new Date().toISOString(),
