@@ -5,8 +5,9 @@ import { Calendar } from "lucide-react";
 import { useFilters } from "@/components/dashboard/filter-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DatePicker } from "@/components/dashboard/date-picker";
+import { LastUpdateBadge } from "@/components/dashboard/last-update-badge";
 
-export function TopBar() {
+export function TopBar({ lastUpdate = null }: { lastUpdate?: string | null }) {
   const { preset, customFrom, customTo, setPreset, setCustomFrom, setCustomTo, clearFilters } = useFilters();
   const [pendingFrom, setPendingFrom] = useState(customFrom);
   const [pendingTo, setPendingTo] = useState(customTo);
@@ -60,7 +61,10 @@ export function TopBar() {
           )}
         </div>
 
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <LastUpdateBadge iso={lastUpdate} />
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );
