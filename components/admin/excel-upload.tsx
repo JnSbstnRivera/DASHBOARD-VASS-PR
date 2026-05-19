@@ -181,7 +181,7 @@ export function ExcelUpload({ forceType, title, subtitle }: ExcelUploadProps) {
                 Click para seleccionar o arrastra el .xlsx aquí
               </p>
               <p className="text-xs text-muted-foreground">
-                TM.xlsx → actualiza Citas + Ventas · MEDIA TOUR.xlsx → actualiza Media Tour
+                Solo archivos .xlsx — solo se cargan datos de 2026 en adelante
               </p>
             </motion.div>
           </motion.div>
