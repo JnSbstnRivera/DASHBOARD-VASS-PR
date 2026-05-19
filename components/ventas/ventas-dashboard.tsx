@@ -62,23 +62,37 @@ type Props = {
 };
 
 export function VentasDashboard({ initialVentas }: Props) {
-  const { preset, customFrom, customTo } = useFilters();
+  const { preset, customFrom, customTo, setMonthRange, clearFilters } = useFilters();
 
   const [selectedAsesores, setSelectedAsesores] = useState<Set<string>>(new Set());
   const [selectedConsultor, setSelectedConsultor] = useState<string | null>(null);
   const [selectedProducto, setSelectedProducto] = useState<string | null>(null);
   const [selectedProcedencia, setSelectedProcedencia] = useState<string | null>(null);
-  const [drillMes, setDrillMes] = useState<string | null>(null);
   const [tablaAbierta, setTablaAbierta] = useState(false);
   const [tablaQuery, setTablaQuery] = useState("");
 
-  useEffect(() => {
-    if (preset === "thisMonth") {
-      setDrillMes(MES_NAMES[new Date().getMonth()]);
-    } else if (preset === "all") {
-      setDrillMes(null);
+  // Mes activo derivado del contexto compartido — propaga el filtro entre dashboards de VASS.
+  const drillMes = useMemo(() => {
+    if (preset === "thisMonth") return MES_NAMES[new Date().getMonth()];
+    if (preset === "custom" && customFrom) {
+      const d = parseISO(customFrom);
+      if (isValid(d)) return MES_NAMES[d.getMonth()];
     }
-  }, [preset]);
+    return null;
+  }, [preset, customFrom]);
+
+  function handleTimelineClick(data: { activeLabel?: string | number } | null) {
+    if (showDaily) return;
+    const label = data?.activeLabel;
+    if (typeof label === "string") {
+      const monthIdx = MES_NAMES.findIndex((m) => capitalize(m) === label);
+      if (monthIdx >= 0) {
+        const first = initialVentas.find((v) => v.closing_date)?.closing_date;
+        const year = first ? parseISO(first).getFullYear() : new Date().getFullYear();
+        setMonthRange(monthIdx, year);
+      }
+    }
+  }
 
   const filtered = useMemo(() => {
     const today = new Date();
@@ -242,7 +256,7 @@ export function VentasDashboard({ initialVentas }: Props) {
     setSelectedConsultor(null);
     setSelectedProducto(null);
     setSelectedProcedencia(null);
-    setDrillMes(null);
+    clearFilters();
   }
   const hayChartFilters =
     selectedAsesores.size > 0 || selectedConsultor || selectedProducto || selectedProcedencia || drillMes;
@@ -336,7 +350,12 @@ export function VentasDashboard({ initialVentas }: Props) {
           <ChartBox title={`Pipeline ${showDaily ? "diario" : "mensual"} · ventas`}>
             {timelineData.length === 0 ? <EmptyChart /> : (
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={timelineData} margin={{ top: 24, right: 32, left: 0, bottom: 8 }}>
+                <LineChart
+                  data={timelineData}
+                  margin={{ top: 24, right: 32, left: 0, bottom: 8 }}
+                  onClick={handleTimelineClick}
+                  style={{ cursor: showDaily ? "default" : "pointer" }}
+                >
                   <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
