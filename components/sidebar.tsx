@@ -29,9 +29,9 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="glass-sidebar flex h-screen w-64 shrink-0 flex-col text-sidebar-foreground">
-      <div className="flex flex-col items-center gap-3 border-b border-border px-4 py-6">
-        <div className="relative h-36 w-36 shrink-0">
+    <aside className="glass-sidebar flex h-screen w-14 shrink-0 flex-col text-sidebar-foreground md:w-64">
+      <div className="flex flex-col items-center gap-3 border-b border-border px-2 py-3 md:px-4 md:py-6">
+        <div className="relative h-10 w-10 shrink-0 md:h-36 md:w-36">
           <Image
             src="/windmar-logo-VASS.png"
             alt="Windmar Home VASS"
@@ -41,7 +41,7 @@ export function Sidebar() {
             priority
           />
         </div>
-        <div className="text-center min-w-0">
+        <div className="hidden text-center min-w-0 md:block">
           <p className="truncate text-base font-bold leading-tight text-foreground">
             VASS
           </p>
@@ -51,7 +51,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 px-2 py-4 md:px-3">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname?.startsWith(item.href);
           const Icon = item.icon;
@@ -59,8 +59,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              title={item.label}
               className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                "group flex items-center justify-center gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors md:justify-start md:px-3",
                 isActive
                   ? "bg-windmar-blue text-white shadow-sm dark:bg-windmar-orange dark:text-windmar-black"
                   : "text-sidebar-foreground hover:bg-muted"
@@ -68,11 +69,11 @@ export function Sidebar() {
             >
               <Icon
                 className={cn(
-                  "h-4 w-4 shrink-0",
+                  "h-5 w-5 shrink-0 md:h-4 md:w-4",
                   isActive ? "" : "text-muted-foreground group-hover:text-foreground"
                 )}
               />
-              <span className="flex-1 font-medium">{item.label}</span>
+              <span className="hidden flex-1 font-medium md:inline">{item.label}</span>
             </Link>
           );
         })}

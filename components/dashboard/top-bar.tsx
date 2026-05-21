@@ -22,7 +22,7 @@ export function TopBar({ lastUpdate = null }: { lastUpdate?: string | null }) {
 
   return (
     <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-xl">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 lg:px-10 2xl:px-14">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-6 lg:px-10 2xl:px-14">
         <div className="flex flex-wrap items-center gap-2">
           <span className="exec-label hidden sm:inline">Filtro fecha</span>
           <button
@@ -33,10 +33,10 @@ export function TopBar({ lastUpdate = null }: { lastUpdate?: string | null }) {
           >
             <Calendar className="h-3.5 w-3.5" /> Mes actual
           </button>
-          <div className="flex items-center gap-1.5">
-            <DatePicker value={pendingFrom} onChange={setPendingFrom} className="w-[150px]" />
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+            <DatePicker value={pendingFrom} onChange={setPendingFrom} className="min-w-0 flex-1 sm:w-[150px] sm:flex-none" />
             <span className="text-xs text-muted-foreground">→</span>
-            <DatePicker value={pendingTo} onChange={setPendingTo} className="w-[150px]" />
+            <DatePicker value={pendingTo} onChange={setPendingTo} className="min-w-0 flex-1 sm:w-[150px] sm:flex-none" />
             <button
               type="button"
               onClick={aplicarFechas}
