@@ -427,6 +427,8 @@ export function SeguimientoDashboard({ initialSeguimiento }: Props) {
                     innerRadius={50}
                     outerRadius={85}
                     paddingAngle={2}
+                    stroke="var(--card)"
+                    strokeWidth={2}
                     onClick={(d) => {
                       const s = (d as { status?: string }).status;
                       if (s) setSelectedStatus(selectedStatus === s ? null : s);
