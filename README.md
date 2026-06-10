@@ -1,14 +1,34 @@
-# 📊 Dashboard Área de Ventas PR
+# 🎯 Dashboard VASS PR
 
-Dashboard ejecutivo del **Call Center de Ventas — Windmar Home Puerto Rico** 🌞⚡
+> Dashboard ejecutivo del Call Center de Ventas — Windmar Home Puerto Rico 🌞⚡
+
+![Estado](https://img.shields.io/badge/Estado-Producci%C3%B3n-2ea043)
+![Stack](https://img.shields.io/badge/Stack-Next.js%2016%20%2B%20React%2019%20%2B%20Supabase-1D429B)
+![Deploy](https://img.shields.io/badge/Deploy-Vercel-000?logo=vercel)
+![Windmar](https://img.shields.io/badge/Windmar-Home%20PR-F89B24)
+
+---
+
+## 🎯 ¿Qué hace?
 
 Visualiza los 3 pipelines del área (Seguimiento de leads, Ventas cerradas y Post-venta/Instalaciones) a partir del Excel maestro **`2026 SEGUIMIENTO VENTAS.xlsx`**, con KPIs, embudo de conversión, ranking de asesores, línea de tiempo diaria y alertas automáticas.
 
 ---
 
-## 🚀 Stack Tecnológico
+## ✨ Características
 
-| Categoría | Tecnología |
+- 🔢 KPIs de los 3 pipelines
+- 🪣 Embudo de conversión Gestiones → Ventas → Instalado
+- 🏆 Ranking de asesores
+- 🚨 Alertas automáticas (asesor con peor conversión, postventas estancadas)
+- 📈 Línea de tiempo diaria
+- 📤 Subida web de Excel y 📥 descarga de Excel filtrado
+
+---
+
+## 🛠️ Stack técnico
+
+| Capa | Tecnología |
 |---|---|
 | 🧠 Framework | Next.js 16 (App Router + Turbopack) |
 | ⚛️ UI | React 19 + TypeScript |
@@ -22,7 +42,80 @@ Visualiza los 3 pipelines del área (Seguimiento de leads, Ventas cerradas y Pos
 
 ---
 
-## 🗺️ Dashboards Disponibles
+## 📁 Estructura del repositorio
+
+```
+dashboard-area-de-ventas-pr/
+├── app/
+│   ├── dashboard/
+│   │   ├── resumen/       🎯 vista 360°
+│   │   ├── seguimiento/   📞 leads
+│   │   ├── ventas/        💰 ventas
+│   │   └── postventa/     🛠️ instalación
+│   ├── admin/             🔐 subida de Excel
+│   ├── api/
+│   │   ├── refresh/upload/    POST .xlsx → Supabase
+│   │   └── download/excel/    GET .xlsx filtrado
+│   ├── icon.svg           📊 favicon (barras)
+│   └── layout.tsx
+├── components/
+│   ├── resumen/           ResumenDashboard 360°
+│   ├── seguimiento/
+│   ├── ventas/
+│   ├── postventa/
+│   ├── dashboard/         Filtros, date-picker, KPIs
+│   └── sidebar.tsx
+├── lib/
+│   ├── queries/           Lecturas Supabase tipadas
+│   ├── supabase/          Clientes (server, browser, service)
+│   └── database.types.ts
+└── public/
+```
+
+---
+
+## 🔧 Variables de entorno
+
+Copiar `.env.example` → `.env.local`:
+
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Zoho CRM (opcional)
+ZOHO_CLIENT_ID=
+ZOHO_CLIENT_SECRET=
+ZOHO_REFRESH_TOKEN=
+```
+
+---
+
+## 🚀 Setup local
+
+```bash
+npm install
+npm run dev          # 🚀 http://localhost:3000
+npm run build        # 📦 build de producción
+npm run lint         # 🔍 ESLint
+npm start            # ▶️ servidor de producción
+```
+
+---
+
+## 📦 Despliegue
+
+Cada `git push origin master` dispara un deploy automático en Vercel.
+Deploy manual:
+
+```bash
+vercel deploy --prod --yes
+```
+
+---
+
+## 🗺️ Dashboards disponibles
 
 ### 1️⃣ Resumen 360° 🎯 — `/dashboard/resumen`
 Vista ejecutiva con todo en una sola pantalla:
@@ -52,7 +145,7 @@ Pipeline de instalación:
 
 ---
 
-## 🔄 Flujo de Datos
+## 🔄 Flujo de datos
 
 ```
 📁 SharePoint
@@ -90,7 +183,7 @@ Pipeline de instalación:
 
 ---
 
-## 📋 Estructura de Hojas Excel
+## 📋 Estructura de hojas Excel
 
 ### 🟦 `VENTAS 2026`
 Columnas clave: Fecha, Cliente, Asesor, Sistema, Monto, Estado, Origen
@@ -103,7 +196,7 @@ Columnas clave: Fecha venta, Cliente, Sistema, Estado instalación, Notas, IN SE
 
 ---
 
-## 🎨 Sistema de Diseño
+## 🎨 Sistema de diseño
 
 **Paleta Windmar:**
 - 🔵 Azul Windmar `#1D429B`
@@ -114,78 +207,6 @@ Columnas clave: Fecha venta, Cliente, Sistema, Estado instalación, Notas, IN SE
 **Tema:** Glass + ambient orbs con `backdrop-filter`, intensidad reducida para no cansar la vista durante turnos largos del call center 👁️
 
 **Modos:** 🌙 Dark (default) · ☀️ Light — toggle en el sidebar
-
----
-
-## ⚙️ Variables de Entorno
-
-Copiar `.env.example` → `.env.local`:
-
-```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-# Zoho CRM (opcional)
-ZOHO_CLIENT_ID=
-ZOHO_CLIENT_SECRET=
-ZOHO_REFRESH_TOKEN=
-```
-
----
-
-## 🛠️ Desarrollo Local
-
-```bash
-npm install
-npm run dev          # 🚀 http://localhost:3000
-npm run build        # 📦 build de producción
-npm run lint         # 🔍 ESLint
-```
-
----
-
-## 🚢 Deploy
-
-Cada `git push origin master` dispara un deploy automático en Vercel.
-Deploy manual:
-
-```bash
-vercel deploy --prod --yes
-```
-
----
-
-## 📁 Estructura del Proyecto
-
-```
-dashboard-area-de-ventas-pr/
-├── app/
-│   ├── dashboard/
-│   │   ├── resumen/       🎯 vista 360°
-│   │   ├── seguimiento/   📞 leads
-│   │   ├── ventas/        💰 ventas
-│   │   └── postventa/     🛠️ instalación
-│   ├── admin/             🔐 subida de Excel
-│   ├── api/
-│   │   ├── refresh/upload/    POST .xlsx → Supabase
-│   │   └── download/excel/    GET .xlsx filtrado
-│   ├── icon.svg           📊 favicon (barras)
-│   └── layout.tsx
-├── components/
-│   ├── resumen/           ResumenDashboard 360°
-│   ├── seguimiento/
-│   ├── ventas/
-│   ├── postventa/
-│   ├── dashboard/         Filtros, date-picker, KPIs
-│   └── sidebar.tsx
-├── lib/
-│   ├── queries/           Lecturas Supabase tipadas
-│   ├── supabase/          Clientes (server, browser, service)
-│   └── database.types.ts
-└── public/
-```
 
 ---
 
@@ -203,5 +224,22 @@ dashboard-area-de-ventas-pr/
 📍 Call Center Bogotá · Área de Ventas PR
 
 ---
+
+## 🔗 Ecosistema Windmar
+
+Parte del trío del área VASS junto con [WINDMAR-VASS-INBOX](https://github.com/JnSbstnRivera/WINDMAR-VASS-INBOX) y [NOTAS-VENTAS-VASS](https://github.com/JnSbstnRivera/NOTAS-VENTAS-VASS).
+
+**Hub padre (Portal ejecutivo):**
+- [WINDMAR-PORTAL-EJECUTIVO](https://github.com/JnSbstnRivera/WINDMAR-PORTAL-EJECUTIVO)
+
+**Dashboards hermanos:**
+- [DASHBOARD-AREA-DE-VENTAS-PR](https://github.com/JnSbstnRivera/DASHBOARD-AREA-DE-VENTAS-PR)
+- [DASHBOARD-TELEMERCADEO-PR](https://github.com/JnSbstnRivera/DASHBOARD-TELEMERCADEO-PR)
+
+---
+
+## 📄 Créditos
+
+Desarrollado por **JnSbstnRivera** (Juan Sebastián Rivera Joven) para **Windmar Home Puerto Rico**. ☀️
 
 🤖 _Construido con [Claude Code](https://claude.com/claude-code)_
