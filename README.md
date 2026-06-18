@@ -1,4 +1,4 @@
-# Dashboard VASS PR
+# DASHBOARD VASS PR
 
 Dashboard ejecutivo del área VASS del call center de **Windmar Home Puerto Rico**. Visualiza los pipelines de seguimiento de leads, ventas cerradas y post-venta a partir del Excel maestro, con KPIs, embudo de conversión, ranking de asesores y alertas automáticas.
 
